@@ -3,7 +3,7 @@ const StealthPlugin = require("puppeteer-extra-plugin-stealth")
 const fs = require("fs");
 
 let chromiumPath = process.platform === "linux" ? "/usr/bin/chromium-browser" : null;
-if (chromiumPath && !fs.existsSync(chromiumPath)) console.log("[node_characterai] Puppeteer - Warning: the specified Chromium path for puppeteer could not be located. If the script does not work properly, you may need to specify a path to the Chromium binary file/executable.");
+if (chromiumPath && !fs.existsSync(chromiumPath)) console.error("[node_characterai] Puppeteer - Warning: the specified Chromium path for puppeteer could not be located. If the script does not work properly, you may need to specify a path to the Chromium binary file/executable.");
 
 class Requester {
     browser = undefined;
@@ -12,7 +12,7 @@ class Requester {
     #initialized = false;
     #hasDisplayed = false;
 
-    #headless = "new";
+    headless = "new";
     puppeteerPath = undefined;
     puppeteerLaunchArgs = [
         "--fast-start",
@@ -29,7 +29,7 @@ class Requester {
     puppeteerNoDefaultTimeout = false;
     puppeteerProtocolTimeout = 0;
     usePlus = false;
-    console = true
+    console = true;
     forceWaitingRoom = false;
 
     constructor() {}
@@ -68,7 +68,7 @@ class Requester {
 
                             const waiting = (waitingRoomTimeLeft != null);
                             if (waiting) {
-                                console.log(`[node_characterai] Puppeteer - Currently in cloudflare's waiting room. Time left: ${waitingRoomTimeLeft}`);
+                                console.warn(`[node_characterai] Puppeteer - Currently in cloudflare's waiting room. Time left: ${waitingRoomTimeLeft}`);
                             } else {
                                 resolve();
                                 clearInterval(interval);
@@ -96,9 +96,9 @@ class Requester {
 
         if(this.console) console.log("[node_characterai] Puppeteer - This is an experimental feature. Please report any issues on github.");
 
-        puppeteer.use(StealthPlugin())
+        puppeteer.use(StealthPlugin());
         const browser = await puppeteer.launch({
-            headless: this.#headless,
+            headless: this.headless,
             args: this.puppeteerLaunchArgs,
             protocolTimeout: this.puppeteerProtocolTimeout || 0, // Props to monckey100
             executablePath: this.puppeteerPath || null
@@ -122,7 +122,7 @@ class Requester {
         await page.setJavaScriptEnabled(true);
         await page.setDefaultNavigationTimeout(0);
 
-        const userAgent = "CharacterAI/1.0.0 (iPhone; iOS 14.4.2; Scale/3.00)";
+        const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
         await page.setUserAgent(userAgent);
 
         // Special thanks to @Parking-Master for this fix
@@ -130,7 +130,7 @@ class Requester {
         const client = await page.target().createCDPSession();
         await client.send("Network.clearBrowserCookies");
         await client.send("Network.clearBrowserCache");
-        await page.goto("https://" + (this.usePlus ? "plus" : "beta") + ".character.ai");
+        await page.goto("https://beta.character.ai/favicon.ico");
         await page.evaluate(() => localStorage.clear());
 
         // If there is no waiting room, the script will continue anyway
@@ -209,122 +209,6 @@ class Requester {
                 });
                 response = await page.goto(url, { waitUntil: "domcontentloaded" });
             }
-        } catch (error) {
-            console.error("[node_characterai] Puppeteer - " + error)
-        }
-
-        return response;
-    }
-
-    async imageUpload(url, headers, localFile = false) {
-        const page = this.page;
-
-        let response
-
-        try {
-            await page.setRequestInterception(false);
-            if (!this.#hasDisplayed) {
-                if(this.console) console.log("[node_characterai] Puppeteer - Eval-fetching is an experimental feature and may be slower. Please report any issues on github")
-                this.#hasDisplayed = true;
-            }
-
-            // The end of this repeated 2 times, is it intentional?
-            // Can it be in the same spot at the end to avoid code repetition?
-            if (localFile) {
-                let dataUrl = fs.readFileSync(url, "base64");
-                response = await page.evaluate(
-                    async (uploadHeaders, dataUrl) => {
-                            var result = {
-                                code: 500
-                            };
-
-                            const b64toBlob = (b64Data, contentType = "", sliceSize = 512) => {
-                                const byteCharacters = atob(b64Data); // <- Watch out, this is deprecated!
-                                const byteArrays = [];
-
-                                for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-                                    const slice = byteCharacters.slice(offset, offset + sliceSize);
-
-                                    const byteNumbers = new Array(slice.length);
-                                    for (let i = 0; i < slice.length; i++) {
-                                        byteNumbers[i] = slice.charCodeAt(i);
-                                    }
-
-                                    const byteArray = new Uint8Array(byteNumbers);
-                                    byteArrays.push(byteArray);
-                                }
-
-                                const blob = new Blob(byteArrays, {
-                                    type: contentType
-                                });
-                                return blob;
-                            }
-
-                            const blob = b64toBlob(dataUrl.includes("base64,") ? dataUrl.split("base64,")[1] : dataUrl);
-                            const file = new File([blob], "image");
-                            const formData = new FormData();
-                            formData.append("image", file);
-
-                            let head = uploadHeaders;
-                            delete head["Content-Type"];
-                            // ^ Is this even being used?
-
-                            const uploadResponse = await fetch("https://beta.character.ai/chat/upload-image/", {
-                                headers: uploadHeaders,
-                                method: "POST",
-                                body: formData
-                            })
-
-                            if (uploadResponse.status == 200) {
-                                result.code = 200;
-
-                                let uploadResponseJSON = await uploadResponse.json();
-                                result.response = uploadResponseJSON.value;
-                            }
-
-                            return result;
-                        },
-                        headers, dataUrl
-                );
-            } else {
-                response = await page.evaluate(
-                    async (uploadHeaders, url) => {
-                            var result = {
-                                code: 500
-                            };
-
-                            const uploadResponse = await fetch(url).then(uploadResponse => uploadResponse.blob()).then(async (blob) => {
-                                const file = new File([blob], "image");
-                                const formData = new FormData();
-                                formData.append("image", file);
-
-                                let head = uploadHeaders;
-                                delete head["Content-Type"];
-                                // ^ Is this even being used?
-
-                                const uploadResponse = await fetch("https://beta.character.ai/chat/upload-image/", {
-                                    headers: uploadHeaders,
-                                    method: "POST",
-                                    body: formData
-                                })
-                                return uploadResponse;
-                            }).then()
-
-                            if (uploadResponse.status == 200) {
-                                result.code = 200;
-
-                                let uploadResponseJSON = await uploadResponse.json();
-                                result.response = uploadResponseJSON.value;
-                            }
-
-                            return result;
-                        },
-                        headers, url
-                );
-            }
-
-            response.status = () => response.code; // compatibilty reasons
-            response.body = () => response.response; // compatibilty reasons
         } catch (error) {
             console.error("[node_characterai] Puppeteer - " + error)
         }

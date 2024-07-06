@@ -1,7 +1,5 @@
 const { Reply, Message, MessageHistory, OutgoingMessage } = require("./message");
 const Parser = require("./parser");
-const mime = require("mime");
-const fetch = require("node-fetch")
 
 class Chat {
     constructor(client, characterId, continueBody) {
@@ -18,21 +16,19 @@ class Chat {
     async fetchHistory(pageNumber) {
         if (!this.client.isAuthenticated()) throw Error("You must be authenticated to do this.");
 
-        // Page number is optional
-        if (pageNumber) {
-            if (typeof(pageNumber) != "number") throw Error("Invalid arguments");
-        }
+        // Page number is optional but must be a number
+        if (pageNumber != null && typeof(pageNumber) != "number")
+            throw Error("Invalid arguments");
 
         const client = this.client;
+        const pageQuery = pageNumber ? `&page_num=${pageNumber}` : "";
 
-        const pageString = pageNumber ? `&page_num=${pageNumber}` : ""
-
-        const request = await this.requester.request(`https://beta.character.ai/chat/history/msgs/user/?history_external_id=${this.externalId}${pageString}`, {
-            headers:client.getHeaders()
-        })
+        const request = await this.requester.request(`https://beta.character.ai/chat/history/msgs/user/?history_external_id=${this.externalId}${pageQuery}`, {
+            headers: client.getHeaders()
+        });
 
         if (request.status() === 200) {
-            const response = await Parser.parseJSON(request)
+            const response = await Parser.parseJSON(request);
             const historyMessages = response.messages;
             const messages = [];
 
@@ -64,99 +60,23 @@ class Chat {
 
         if (request.status() === 200) {
             const response = await Parser.parseJSON(request);
+
+            // guests restricted/abort message
+            if (response["force_login"] == true ||
+                response["abort"]       == true) 
+                return new Reply(this, response);
+
             const replies = response.replies;
+            const messages = [];
 
-            const messages = []
-
-            for (let i = 0; i < replies.length; i++) {
-                messages.push(new Reply(this, response));
-            }
+            for (let i = 0; i < replies.length; i++)
+                messages.push(new Reply(this, response, i));
             
             if (!singleReply) return messages;
             else return messages.pop();
-        } else throw Error("Failed sending message.")
+        } else throw Error("Failed sending message.");
     }
     
-    // Image generation
-    async uploadImage(content, mimeType = null) {
-        if (!this.client.isAuthenticated()) throw Error("You must be authenticated to do this.");
-        
-        /*
-            Content Types:
-
-            * Image URL
-            * File Path
-            * Buffer
-            * ReadableStream
-        */
-        
-        let buffer;
-
-        try {
-            // Auto detection for mime type
-            if (!mimeType) {
-                try {
-                    url = new URL(content).pathname;
-                    mimeType = mime.getType(url);
-                } catch (error) {}
-                if (fs.existsSync(content)) mimeType = mime.getType(content);
-            }
-            
-            await fetch(content)
-                .then(response => {
-                    if (!response.ok) {
-                    throw new Error(`Content or image not found`);
-                    }
-                    return response.buffer();
-                })
-                .then(imageBuffer => {
-                    buffer = imageBuffer
-                })
-                .catch(error => {
-                    console.error('Content or image not found');
-                });
-        } catch (error) {
-            throw Error("Content is invalid or not an image");
-        }
-        if (!buffer) throw Error("Invalid content");
-
-        const client = this.client;
-
-        const error = () => {
-            throw Error("Failed uploading image.");
-        };
-        try {
-            const request = this.requester.imageUpload(buffer, client);
-            
-            if (request.status() === 200) {
-                return `https://characterai.io/i/400/static/user/${request.response}`;
-            } else error();
-        } catch (err) {
-          error();
-        }
-    }
-    async generateImage(prompt) {
-        if (!this.client.isAuthenticated()) throw Error("You must be authenticated to do this.");
-        
-        const client = this.client;
-
-        if (!client.isAuthenticated()) throw Error("You must be authenticated to do this.");
-        if (typeof prompt != "string") throw Error("Invalid arguments");
-
-        const request = await this.requester.request("https://beta.character.ai/chat/generate-image/", {
-            headers: client.getHeaders(),
-            method: "POST",
-            client: this.client,
-            body: Parser.stringify({
-              image_description: prompt
-            })
-        }, true);
-
-        if (request.status() === 200) {
-            const response = await Parser.parseJSON(request);
-            return response.image_rel_path;
-        } else throw Error("Failed generating image.")
-    }
 
     // Conversations
     async changeToConversationId(conversationExternalId, force = false) {
@@ -184,21 +104,21 @@ class Chat {
         if (!this.client.isAuthenticated()) throw Error("You must be authenticated to do this.");
 
         const client = this.client;
-        const request = await this.requester.request(`https://beta.character.ai/chat/character/histories/`, {
+        const request = await this.requester.request(`https://neo.character.ai/chats/?character_ids=${this.externalId}&num_preview_turns=${amount}`, {
             headers:client.getHeaders(),
             method:"POST",
             body: Parser.stringify({
                 "external_id" : this.characterId,
                 "number" : amount
             })
-        })
+        });
 
         if (request.status() === 200) {
             const response = await Parser.parseJSON(request)
             
             this.externalId = response.external_id;
             return response;
-        } else throw Error("Failed saving & creating new chat.")
+        } else throw Error("Failed saving & creating new chat.");
     }
 
     // Messages
@@ -207,7 +127,7 @@ class Chat {
         messageId = messageId.toString();
         if (!this.client.isAuthenticated()) throw Error("You must be authenticated to do this.");
 
-        const history = await this.fetchHistory()
+        const history = await this.fetchHistory();
         const historyMessages = history.messages;
 
         for (let i = 0; i < historyMessages.length; i++) {
@@ -215,6 +135,7 @@ class Chat {
             
             if (message.id == messageId) return message;
         }
+
         return null;
     }
     async deleteMessage(messageId) {
@@ -228,10 +149,10 @@ class Chat {
             method:"POST",
             body: Parser.stringify({
                 "history_id" : this.externalId,
-                "ids_to_delete" : [messageId],
+                "uuids_to_delete" : [messageId],
                 "regenerating" : false
             })
-        })
+        });
 
         let passing = false;
 
@@ -253,12 +174,13 @@ class Chat {
             for (let i = 0; i < messageIds.length; i++) {
                 const messageId = messageIds[i];
 
-                if (typeof(messageId) == "string") {
-                    messagesToDelete.push(messageId);
-                }
+                if (typeof(messageId) != "string")
+                    continue;
+
+                messagesToDelete.push(messageId);
             }
         } catch (error) {
-            throw Error("Failed to delete messages.")
+            throw Error("Failed to delete messages.");
         };
 
         const client = this.client;
@@ -267,10 +189,10 @@ class Chat {
             method:"POST",
             body: Parser.stringify({
                 "history_id" : this.externalId,
-                "ids_to_delete" : messagesToDelete,
+                "uuids_to_delete" : messagesToDelete,
                 "regenerating" : false
             })
-        })
+        });
 
         let passing = false;
 
@@ -282,21 +204,45 @@ class Chat {
 
         if (!passing) throw Error("Failed to delete messages.");
     }
-    async deleteMessagesBulk(amount = 50, descending = false) {
+
+    // For info, descending means from end to begin (so last to first)
+    async deleteMessagesBulk(amount = 50, descending = false, printSteps = false) {
         if (typeof(amount) != "number") throw Error("Invalid arguments");
+        if (amount <= 0) throw Error("Amount must be higher than zero.");
         if (!this.client.isAuthenticated()) throw Error("You must be authenticated to do this.");
         if (this.client.isGuest()) throw Error("Guest accounts cannot bulk delete messsages.");
 
         let idsToDelete = [];
+        let cumulatedHistory = [];
 
-        const history = await this.fetchHistory()
-        const historyMessages = history.messages;
+        // first we will fetch all the pages messages
+        // each page has 20 messages
+        const pagesToFetch = Math.floor(amount / 20);
 
-        for (let i = 0; i < amount; i++) {
-            if (!descending) i = (amount - i);
-            const message = historyMessages[i];
-            
-            if (message) idsToDelete.push(message.id);
+        if (pagesToFetch >= 10) 
+            console.warn("[node_characterai] Warning: deleting this much messages in bulk could take a while or get you rate limited, so make sure you know what you're doing. Also, you can set the argument printSteps to true to show debugging steps.");
+
+        let nextPage = null;
+        // keep going until it doesnt have more pages
+        for (let i = 0; i < pagesToFetch; i++) {
+            const thisPagesHistory = await this.fetchHistory(nextPage);
+
+            if (printSteps == true && this.requester.console) console.log(`[node_characterai] Bulk delete - Current page: ${999999-i}`);
+            cumulatedHistory = cumulatedHistory.concat(thisPagesHistory.messages);
+            nextPage = thisPagesHistory.nextPage;
+
+            if (!thisPagesHistory.hasMore) break;
+        }
+
+        if (printSteps == true && this.requester.console) console.log(`[node_characterai] Bulk delete - Total messages to delete: ${cumulatedHistory.length}`);
+
+        const amountToLoop = Math.max(cumulatedHistory.length, amount);
+
+        for (let i = 0; i < amountToLoop; i++) {
+            const index = descending ? amountToLoop - 1 - i : i;
+            const message = cumulatedHistory[index];
+
+            if (message) idsToDelete.push(message.uuid);
         }
 
         if (idsToDelete.length == 0) return;
@@ -307,10 +253,10 @@ class Chat {
             method:"POST",
             body: Parser.stringify({
                 "history_id" : this.externalId,
-                "ids_to_delete" : idsToDelete,
-                "regenerating" : false
+                "uuids_to_delete" : idsToDelete
             })
-        })
+        });
+
         let passing = false;
 
         if (request.status() === 200) {
@@ -332,14 +278,14 @@ class Chat {
             body: Parser.stringify({
                 "character_external_id" : this.characterId
             })
-        })
+        });
 
         if (request.status() === 200) {
-            const response = await Parser.parseJSON(request)
+            const response = await Parser.parseJSON(request);
             
             this.externalId = response.external_id;
             return response;
-        } else throw Error("Failed saving & creating new chat.")
+        } else throw Error("Failed saving & creating new chat.");
     }
 }
 

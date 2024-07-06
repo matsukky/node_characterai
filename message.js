@@ -32,11 +32,6 @@ class OutgoingMessage {
             stream_every_n_steps: getValueOrDefault("stream_every_n_steps", 16),
             chunks_to_pad: getValueOrDefault("chunks_to_pad", 8),
             is_proactive: getValueOrDefault("is_proactive", true),
-            // Image generation
-            image_rel_path: getValueOrDefault("image_rel_path", ""),
-            image_description: getValueOrDefault("image_description", ""),
-            image_description_type: getValueOrDefault("image_description_type", "AUTO_IMAGE_CAPTIONING"),
-            image_origin_type: getValueOrDefault("image_origin_type", "UPLOADED"),
         }
 
         this.payload = payload;
@@ -49,13 +44,12 @@ class Message {
         this.chat = chat;
         this.rawOptions = options;
 
+        this.uuid = options.uuid;
         this.id = options.id
         this.text = options.text
         this.src = options.src
         this.tgt = options.tgt
         this.isAlternative = options.is_alternative
-        this.imageRelativePath = options.image_rel_path
-        this.imagePromptText = options.image_prompt_text
         this.deleted = null
         this.srcName = options.src__name
         this.srcInternalId = options.src__user__username
@@ -88,12 +82,12 @@ class Message {
 
         try {
             const messagesToDelete = [];
-            messagesToDelete.push(this.id);
+            messagesToDelete.push(this.uuid);
 
             if (deletePreviousToo) {
                 const previousMessage = await this.getPreviousMessage();
-                if (previousMessage != null && previousMessage.id != null && previousMessage.deleted != true);
-                    messagesToDelete.push(previousMessage.id);
+                if (previousMessage != null && previousMessage.uuid != null && previousMessage.deleted != true);
+                    messagesToDelete.push(previousMessage.uuid);
             }
 
             await chat.deleteMessages(messagesToDelete);
@@ -112,16 +106,15 @@ class Message {
 };
 
 class Reply {
-    constructor(chat, options) {
+    constructor(chat, options, index) {
         this.chat = chat;
 
-        if (options.force_login == true) throw Error("Too many messages! (this might be because you use a guest account)");
+        if (options.force_login == true) throw Error("Too many messages! (this might be because you use a guest account or that characterai has restricted messages for guests.)");
         if (options.abort == true) throw Error("Could not get the full reply because it was aborted. This happens often when the output was filtered for violent or explicit content.");
 
-        const replyOptions = options.replies[0];
+        const replyOptions = options.replies[index];
         this.text = replyOptions.text
         this.id = replyOptions.id
-        this.imageRelativePath = replyOptions.image_rel_path
 
         const srcCharacterDict = options.src_char;
         this.srcCharacterName = srcCharacterDict.participant.name

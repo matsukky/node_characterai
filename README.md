@@ -4,8 +4,7 @@
 
 ## Intro
 
-This repository is inspired by [RichardDorian's unofficial node API](https://github.com/RichardDorian/node-character.ai/).
-Though, I found it hard to use and it was not really stable and archived. So I remade it in javascript.
+This repository is a fork of the [Coloride's characterai repo](https://github.com/realcoloride/node_characterai), itself inspired by [RichardDorian's unofficial node API](https://github.com/RichardDorian/node-character.ai/). I pretty maniac of depedencies errors and doesn't need image scrapping for my projects.
 
 **This project is not affiliated with Character AI in any way! It is a community project.**
 The purpose of this project is to bring and build projects powered by Character AI.
@@ -24,7 +23,7 @@ If you like this project, please check their [website](https://character.ai/).
 ## Installation
 
 ```bash
-npm install node_characterai
+npm install @matsukky/node_characterai
 ```
 
 ## Usage
@@ -32,7 +31,7 @@ npm install node_characterai
 Basic guest authentication and message:
 
 ```javascript
-const CharacterAI = require("node_characterai");
+const CharacterAI = require("@matsukky/node_characterai");
 const characterAI = new CharacterAI();
 
 (async () => {
@@ -42,6 +41,7 @@ const characterAI = new CharacterAI();
   // Place your character's id here
   const characterId = "8_1NyR8w1dOXmI1uWaieQcd147hecbdIK7CeEAIrdJw";
 
+  // Create a chat object to interact with the conversation
   const chat = await characterAI.createOrContinueChat(characterId);
 
   // Send a message
@@ -54,19 +54,39 @@ const characterAI = new CharacterAI();
 
 ## Using an Access Token
 
-Some parts of the API, like managing a conversation, requires you to be logged in using an `accessToken`.
+Some parts of the API (like managing a conversation) require you to be logged in using a `sessionToken`.
 
 To get it, you can open your browser, go to the [Character.AI website](https://character.ai) in `localStorage`.
 
-To do so:
+
+
+---
+### ⚠️ WARNING: DO NOT share your session token to anyone you do not trust or if you do not know what you're doing. 
+#### _Anyone with your session token could have access to your account without your consent. Do this at your own risk._
+---
+
+### On PC:
 1. Open the Character.AI website in your browser (https://beta.character.ai)
 2. Open the developer tools (<kbd>F12</kbd>, <kbd>Ctrl+Shift+I</kbd>, or <kbd>Cmd+J</kbd>)
 3. Go to the `Application` tab
 4. Go to the `Storage` section and click on `Local Storage`
-5. Look for the `@@auth0spajs@@::dyD3gE281MqgISG7FuIXYhL2WEknqZzv::https://auth0.character.ai/::openid profile email offline_access` key
-6. Open the body with the arrows and copy the access token
+5. Look for the `char_token` key
+6. Open the object, right click on value and copy your session token.
 
-![Access_Token](https://i.imgur.com/09Q9mLe.png)
+![Session_Token](https://github.com/realcoloride/node_characterai/assets/108619637/1d46db04-0744-42d2-a6d7-35152b967a82)
+
+### On Mobile (and PC in the devtools):
+
+1. Open the Character.AI website in your browser on the OLD interface (https://old.character.ai/)
+2. Open the URL bar, write `javascript:` (case sensitive) and paste the following:
+```javascript
+(function(){let e=window.localStorage["char_token"];if(!e){alert("You need to log in first!");return;}let t=JSON.parse(e).value;document.documentElement.innerHTML=`<div><i><p>provided by node_characterai - <a href="https://github.com/realcoloride/node_characterai?tab=readme-ov-file#using-an-access-token">click here for more information</a></p></i><p>Here is your session token:</p><input value="${t}" readonly><p><strong>Do not share this with anyone unless you know what you are doing! This is your personal session token. If stolen or requested by someone you don't trust, they could access your account without your consent; if so, please close the page immediately.</strong></p><button id="copy" onclick="navigator.clipboard.writeText('${t}'); alert('Copied to clipboard!')">Copy session token to clipboard</button><button onclick="window.location.reload();">Refresh the page</button></div>`;localStorageKey=null;storageInformation=null;t=null;})();
+```
+3. The following page should appear:
+![Access_Token_Mobile](https://github.com/realcoloride/node_characterai/assets/108619637/2954586c-5dab-4e1c-820c-4e8528653d14)
+
+4. Click the respective buttons to copy your access token or id token to your clipboard.
+---
 
 When using the package, you can:
 * Login as guest using `authenticateAsGuest()` - *for mass usage or testing purposes*
@@ -81,44 +101,22 @@ For example, if you go to the chat page of the character `Discord Moderator` you
 The last part of the URL is the character ID:
 ![Character_ID](https://i.imgur.com/nd86fN4.png)
 
-## Image Interactions
-### WARNING: This part is currently experimental, if you encounter any problem, open an [**Issue**](https://github.com/realcoloride/node_characterai/issues).
-
-🖼️ Character AI has the ability to generate and interpret images in a conversation. Some characters base this concept into special characters, or maybe use it for recognizing images, or to interact with a character and give it more details on something: *the possibilities are endless*.
-
-💁 Most of the Character AI image features can be used like so:
-
-```javascript
-// Most of these functions will return you an URL to the image
-await chat.generateImage("dolphins swimming in green water");
-
-// If no mime type (file extension) is specified, the script will automatically detect it
-await chat.uploadImage("https://www.example.com/image.jpg", "image/jpeg");
-await chat.uploadImage("./photos/image.jpg");
-
-// Other supported types are Buffers, Readable Streams, File Paths, and URLs
-await chat.uploadImage(imageBuffer, "image/png");
-
-// Including the image relative path is necessary to upload an image
-await chat.sendAndAwaitResponse({ text: "What is in this image?", { image_rel_path: "https://www.example.com/coffee.jpg" } }, true);
-```
-*Props to @creepycats for implementing most of this stuff out*
 
 ## Troubleshooting
 
 |**Problem**|Answer|
 |-------|------|
-|❌ **Token was invalid**|Make sure your token is actually valid and you copied your entire token (its pretty long).|
+|❌ **Token was invalid**|Make sure your token is actually valid and you copied your entire token (its pretty long) or, you have not updated the package.|
 |⚠️ **The specified Chromium path for puppeteer could not be located**|On most systems, puppeteer will automatically locate Chromium. But on certain distributions, the path has to be specified manually. This warning occurs if `node_characterai` could not locate Chromium on linux (*/usr/bin/chromium-browser*), and will error if puppeteer cannot locate it automatically. See [this](#specifying-chromiums-path) for a fix.|
 |😮 **Why are chromium processes opening?**|This is because as of currently, the simple fetching is broken and I use puppeteer (a chromium browser control library) to go around cloudflare's restrictions.|
 |👥 **`authenticateAsGuest()` doesn't work**|See issue [#14](https://github.com/realcoloride/node_characterai/issues/14).|
 |🦒 **Hit the max amount of messages?**|Sadly, guest accounts only have a limited amount of messages before they get limited and forced to login. See below for more info 👇|
-|🪐 **How to use an account to mass use the library?**|You can use **conversations**, a feature introduced in `1.0.0`, to assign to users and channels. **To reproduce a conversation, use OOC (out of character) to make the AI think you're with multiple people.** __See an example here:__ ![chrome_RDbmXXtFNl](https://user-images.githubusercontent.com/108619637/224778145-284dd89e-7960-499c-b0f0-0deca419c578.png)![chrome_BgF8crPvqC](https://user-images.githubusercontent.com/108619637/224778153-c2a42a26-c5f7-4148-9644-34353482833e.png) (Disclaimer: on some characters, their personality will make them ignore any OOC request).|
+|🪐 **How to use an account to mass use the library?**|You can use **conversations**, a feature introduced in `1.0.0`, to assign to users and channels. **To reproduce a conversation, use OOC (out of character) to make the AI think you're with multiple people.** __See an example here:__ ![chrome_RDbmXXtFNl](https://user-images.githubusercontent.com/108619637/224778145-284dd89e-7960-499c-b0f0-0deca419c578.png)![chrome_BgF8crPvqC](https://user-images.githubusercontent.com/108619637/224778153-c2a42a26-c5f7-4148-9644-34353482833e.png) (Disclaimer: on some characters, their personality will make them ignore any OOC request). |
+|🏃 **How do I avoid concurrency and crashes when using more than one request at a time?**|Check the solution found by @SeoulSKY [here](https://github.com/realcoloride/node_characterai/issues/157#issuecomment-2005709711) using `async-mutex`.|
 |📣 **Is this official?**|No, this project is made by a fan of the website and is unofficial. *To support the developers, please check out [their website](https://beta.character.ai)*.|
 |😲 **Did something awesome with `node_characterai`?**|Please let me know!|
-|✉️ **Want to contact me?**|See my profile|
-|💡 **Have an idea?**|Open an issue in the [**Issues**](https://github.com/realcoloride/node_characterai/issues) tab|
-|➕ **Other issue?**|Open an issue in the [**Issues**](https://github.com/realcoloride/node_characterai/issues) tab|
+|☕ **Want to support the orginal creator?**|You can send me a coffee on ko.fi: https://ko-fi.com/coloride.|
+|💡 **Have an idea or find a issue?**|This is a little fork for remove image generation and not working h24 on it... I recomand you to open an issue in the [**Issues** of the orginial repo](https://github.com/realcoloride/node_characterai/issues) tab|
 
 ## In-depth troubleshooting
 #### **🤚 Before you scroll, please know that:**
@@ -179,4 +177,4 @@ $ which chromium-browser # or whatever command you use to launch chrome
 
 📜 If you use this API, you also bound to the terms of usage of their website.
 
-*(real)coloride - 2023, Licensed MIT.*
+2023-2024, Licensed MIT.*

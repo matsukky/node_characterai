@@ -30,7 +30,7 @@
   "dependencies": {
     "json-bigint": "^1.0.0",
     "node-fetch": "^3.3.2",
-    "puppeteer": "^19.11.1",
+    "puppeteer": "^22.12.1",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "uuid": "^10.0.0"

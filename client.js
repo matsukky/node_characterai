@@ -229,7 +229,7 @@ class Client {
     }
     async authenticateAsGuest() {
         if (this.isAuthenticated()) throw Error("Already authenticated");
-        if(this.requester.console) cconsole.log("[node_characterai] Puppeteer - Warning: Guest users can only send up to 10 messages.");
+        console.warn("[node_characterai] Warning: Guest users can only send up to 10 messages.");
         await this.requester.initialize();
 
         let generating = false;

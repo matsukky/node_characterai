@@ -29,6 +29,7 @@ class Requester {
     puppeteerNoDefaultTimeout = false;
     puppeteerProtocolTimeout = 0;
     usePlus = false;
+    console = true
     forceWaitingRoom = false;
 
     constructor() {}
@@ -79,8 +80,8 @@ class Requester {
                     interval = setInterval(check, minute);
                     await check();
                 } catch (error) {
-                    console.log("[node_characterai] Puppeteer - There was a fatal error while checking for cloudflare's waiting room");
-                    console.log(error);
+                    console.error("[node_characterai] Puppeteer - There was a fatal error while checking for cloudflare's waiting room");
+                    console.error(error);
                 }
             });
         }
@@ -93,7 +94,7 @@ class Requester {
             this.uninitialize();
         });
 
-        console.log("[node_characterai] Puppeteer - This is an experimental feature. Please report any issues on github.");
+        if(this.console) console.log("[node_characterai] Puppeteer - This is an experimental feature. Please report any issues on github.");
 
         puppeteer.use(StealthPlugin())
         const browser = await puppeteer.launch({
@@ -135,7 +136,7 @@ class Requester {
         // If there is no waiting room, the script will continue anyway
         await this.waitForWaitingRoom(page);
 
-        console.log("[node_characterai] Puppeteer - Done with setup");
+        if(this.console) console.log("[node_characterai] Puppeteer - Done with setup");
     }
 
     async request(url, options) {
@@ -157,7 +158,7 @@ class Requester {
 
             await page.setRequestInterception(false);
             if (!this.#hasDisplayed) {
-                console.log("[node_characterai] Puppeteer - Eval-fetching is an experimental feature and may be slower. Please report any issues on github")
+                if(this.console) console.log("[node_characterai] Puppeteer - Eval-fetching is an experimental feature and may be slower. Please report any issues on github")
                 this.#hasDisplayed = true;
             }
 
@@ -203,13 +204,13 @@ class Requester {
                         initialRequest = false;
                         request.continue(data);
                     } catch (error) {
-                        console.log("[node_characterai] Puppeteer - Non fatal error: " + error);
+                        console.error("[node_characterai] Puppeteer - Non fatal error: " + error);
                     }
                 });
                 response = await page.goto(url, { waitUntil: "domcontentloaded" });
             }
         } catch (error) {
-            console.log("[node_characterai] Puppeteer - " + error)
+            console.error("[node_characterai] Puppeteer - " + error)
         }
 
         return response;
@@ -223,7 +224,7 @@ class Requester {
         try {
             await page.setRequestInterception(false);
             if (!this.#hasDisplayed) {
-                console.log("[node_characterai] Puppeteer - Eval-fetching is an experimental feature and may be slower. Please report any issues on github")
+                if(this.console) console.log("[node_characterai] Puppeteer - Eval-fetching is an experimental feature and may be slower. Please report any issues on github")
                 this.#hasDisplayed = true;
             }
 
@@ -325,7 +326,7 @@ class Requester {
             response.status = () => response.code; // compatibilty reasons
             response.body = () => response.response; // compatibilty reasons
         } catch (error) {
-            console.log("[node_characterai] Puppeteer - " + error)
+            console.error("[node_characterai] Puppeteer - " + error)
         }
 
         return response;

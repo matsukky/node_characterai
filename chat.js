@@ -1,7 +1,7 @@
 const { Reply, Message, MessageHistory, OutgoingMessage } = require("./message");
 const Parser = require("./parser");
-const jimp = require("jimp");
 const mime = require("mime");
+const fetch = require("node-fetch")
 
 class Chat {
     constructor(client, characterId, continueBody) {
@@ -102,8 +102,19 @@ class Chat {
                 if (fs.existsSync(content)) mimeType = mime.getType(content);
             }
             
-            const image = await jimp.read(content);
-            buffer = image.getBase64(mimeType || "image/png");
+            await fetch(content)
+                .then(response => {
+                    if (!response.ok) {
+                    throw new Error(`Content or image not found`);
+                    }
+                    return response.buffer();
+                })
+                .then(imageBuffer => {
+                    buffer = imageBuffer
+                })
+                .catch(error => {
+                    console.error('Content or image not found');
+                });
         } catch (error) {
             throw Error("Content is invalid or not an image");
         }
@@ -115,12 +126,12 @@ class Chat {
             throw Error("Failed uploading image.");
         };
         try {
-            const request = this.requester.uploadBuffer(buffer, client);
+            const request = this.requester.imageUpload(buffer, client);
             
             if (request.status() === 200) {
                 return `https://characterai.io/i/400/static/user/${request.response}`;
             } else error();
-        } catch (error) {
+        } catch (err) {
           error();
         }
     }
